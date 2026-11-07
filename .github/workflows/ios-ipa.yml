@@ -1,0 +1,90 @@
+name: iOS · Build unsigned IPA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      BUNDLE_ID: eu.robinjuhas.rjwallpaper
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode 27
+        shell: bash
+        run: |
+          if ! xcodebuild -version | grep -q '^Xcode 27'; then
+            XCODE="$(find /Applications -maxdepth 1 -type d -name 'Xcode_27*.app' | sort | tail -n 1)"
+            test -n "$XCODE"
+            sudo xcode-select --switch "$XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Build iPhone app
+        run: |
+          xcodebuild -project RJWallpaper.xcodeproj -scheme RJWallpaper \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/device" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build -quiet
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p dist "$RUNNER_TEMP/ipa/Payload"
+          APP="$RUNNER_TEMP/device/Build/Products/Release-iphoneos/RJWallpaper.app"
+          test -x "$APP/RJWallpaper"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")" = "$BUNDLE_ID"
+          test "$(lipo -archs "$APP/RJWallpaper")" = arm64
+          ditto "$APP" "$RUNNER_TEMP/ipa/Payload/RJWallpaper.app"
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/RJ-Wallpaper-Studio-1.0.0-unsigned.ipa" Payload)
+          unzip -tq dist/*.ipa
+
+      - name: Build and launch on an iPhone simulator
+        run: |
+          DEVICE="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, key=lambda key: tuple(map(int, key.split(".iOS-")[-1].split("-"))) if ".iOS-" in key else (0,), reverse=True):
+              iphones = [d for d in devices[runtime] if d["name"].startswith("iPhone") and d["isAvailable"]]
+              if iphones:
+                  print(next((d for d in iphones if d["name"] == "iPhone 17 Pro Max"), iphones[0])["udid"])
+                  break
+          ')"
+          test -n "$DEVICE"
+          xcrun simctl boot "$DEVICE" || xcrun simctl list devices | grep "$DEVICE" | grep -q Booted
+          xcodebuild -project RJWallpaper.xcodeproj -scheme RJWallpaper \
+            -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" \
+            -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=NO build -quiet
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl status_bar "$DEVICE" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState unplugged --batteryLevel 100
+          xcrun simctl install "$DEVICE" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/RJWallpaper.app"
+          xcrun simctl launch "$DEVICE" "$BUNDLE_ID"
+          sleep 4
+          xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/RJ-Wallpaper-Simulator.png"
+          xcrun simctl terminate "$DEVICE" "$BUNDLE_ID"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v6
+        with:
+          name: RJ-Wallpaper-Studio-unsigned
+          path: dist/*.ipa
+          if-no-files-found: error
+
+      - name: Upload simulator screenshot
+        uses: actions/upload-artifact@v6
+        with:
+          name: RJ-Wallpaper-Simulator
+          path: ${{ runner.temp }}/RJ-Wallpaper-Simulator.png
+          if-no-files-found: error

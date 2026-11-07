@@ -1,0 +1,92 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		24D6AC070A547F89568286D8 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RJWallpaperApp.swift; sourceTree = "<group>"; };
+		FA8437B2B5073D81B5AC252E = { isa = PBXBuildFile; fileRef = 24D6AC070A547F89568286D8; };
+		A9FD813452DC6E272E4DC6CC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioView.swift; sourceTree = "<group>"; };
+		30EC65E03371886B8CA23A62 = { isa = PBXBuildFile; fileRef = A9FD813452DC6E272E4DC6CC; };
+		3B6A9B218DD0570D51979B3A = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewCanvas.swift; sourceTree = "<group>"; };
+		E09B60A36A736483FE48D471 = { isa = PBXBuildFile; fileRef = 3B6A9B218DD0570D51979B3A; };
+		E1652BD4FCC7E3FBE4DA77E0 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPanel.swift; sourceTree = "<group>"; };
+		BD6534CFD298AE1FB693542E = { isa = PBXBuildFile; fileRef = E1652BD4FCC7E3FBE4DA77E0; };
+		37200C3DBBA02BC393ABC6C1 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Media.swift; sourceTree = "<group>"; };
+		128AB254E4953CDC88298F10 = { isa = PBXBuildFile; fileRef = 37200C3DBBA02BC393ABC6C1; };
+		3BA16EF072756DA1AC4E5399 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderEngine.swift; sourceTree = "<group>"; };
+		1919494AF2A3F40F4EAFED82 = { isa = PBXBuildFile; fileRef = 3BA16EF072756DA1AC4E5399; };
+		795A02A63DC9C1E86758E98F = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		66CFEA91D6952757E4C93F6C = { isa = PBXBuildFile; fileRef = 795A02A63DC9C1E86758E98F; };
+		A8792157CB4F27FB949C035F = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RJWallpaper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0282CDBEE91B0AC00351D03 = { isa = PBXGroup; children = ( BA0536AE3B0EEF6736AC2185, 0A3E27B8CA818264D75C8D81, ); sourceTree = "<group>"; };
+		BA0536AE3B0EEF6736AC2185 = { isa = PBXGroup; children = ( 24D6AC070A547F89568286D8, A9FD813452DC6E272E4DC6CC, 3B6A9B218DD0570D51979B3A, E1652BD4FCC7E3FBE4DA77E0, 37200C3DBBA02BC393ABC6C1, 3BA16EF072756DA1AC4E5399, 795A02A63DC9C1E86758E98F, ); path = App; sourceTree = "<group>"; };
+		0A3E27B8CA818264D75C8D81 = { isa = PBXGroup; children = ( A8792157CB4F27FB949C035F, ); name = Products; sourceTree = "<group>"; };
+		878A52FC5FF6A57D50B7B870 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = ( FA8437B2B5073D81B5AC252E, 30EC65E03371886B8CA23A62, E09B60A36A736483FE48D471, BD6534CFD298AE1FB693542E, 128AB254E4953CDC88298F10, 1919494AF2A3F40F4EAFED82, ); runOnlyForDeploymentPostprocessing = 0; };
+		E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (  ); runOnlyForDeploymentPostprocessing = 0; };
+		41D311A605520FC7B8B9A980 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = ( 66CFEA91D6952757E4C93F6C, ); runOnlyForDeploymentPostprocessing = 0; };
+		34A04005BCAF206EEC990BD9 = { isa = PBXNativeTarget; buildConfigurationList = 78F249D9140B5D7B47DA2B7D; buildPhases = ( 878A52FC5FF6A57D50B7B870, E2AA269EB967A8853A258BFA, 41D311A605520FC7B8B9A980, ); buildRules = (); dependencies = (); name = RJWallpaper; productName = RJWallpaper; productReference = A8792157CB4F27FB949C035F; productType = "com.apple.product-type.application"; };
+		244210E48437B6556980A702 = { isa = PBXProject; attributes = { LastSwiftUpdateCheck = 2700; LastUpgradeCheck = 2700; }; buildConfigurationList = DF10D92617D0252A0BF9C919; compatibilityVersion = "Xcode 14.0"; developmentRegion = de; hasScannedForEncodings = 0; knownRegions = (de, Base,); mainGroup = A0282CDBEE91B0AC00351D03; productRefGroup = 0A3E27B8CA818264D75C8D81; projectDirPath = ""; projectRoot = ""; targets = ( 34A04005BCAF206EEC990BD9, ); };
+		7607E060366236497909AD63 = { isa = XCBuildConfiguration; buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			}; name = Debug; };
+		20D16222A5CB9C5786FEB6B3 = { isa = XCBuildConfiguration; buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "RJ Wallpaper";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "RJ Wallpaper speichert deine fertigen Hintergrundbilder und Live Photos in Fotos.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = eu.robinjuhas.rjwallpaper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			}; name = Debug; };
+		0CC31A010A9EAFED2597BEBC = { isa = XCBuildConfiguration; buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_TESTABILITY = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			}; name = Release; };
+		A74CFA757CE7CA1700BC6197 = { isa = XCBuildConfiguration; buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "RJ Wallpaper";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "RJ Wallpaper speichert deine fertigen Hintergrundbilder und Live Photos in Fotos.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = eu.robinjuhas.rjwallpaper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				TARGETED_DEVICE_FAMILY = 1;
+			}; name = Release; };
+		DF10D92617D0252A0BF9C919 = { isa = XCConfigurationList; buildConfigurations = ( 7607E060366236497909AD63, 0CC31A010A9EAFED2597BEBC, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		78F249D9140B5D7B47DA2B7D = { isa = XCConfigurationList; buildConfigurations = ( 20D16222A5CB9C5786FEB6B3, A74CFA757CE7CA1700BC6197, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+	};
+	rootObject = 244210E48437B6556980A702;
+}
