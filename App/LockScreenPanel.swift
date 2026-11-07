@@ -75,7 +75,7 @@ struct LockScreenPanel: View {
             }
         }
         .interactiveDismissDisabled(working)
-        .fileImporter(isPresented: $pickingAudio, allowedContentTypes: [.audio]) { result in
+        .fileImporter(isPresented: $pickingAudio, allowedContentTypes: [.item]) { result in
             switch result {
             case .success(let url):
                 Task { await importAudio(url) }
@@ -100,10 +100,10 @@ struct LockScreenPanel: View {
             HStack(spacing: 12) {
                 Image(systemName: "waveform").foregroundStyle(.mint)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(player.audioTitle ?? "Audiodatei auswählen")
+                    Text(player.audioTitle ?? "Audio oder Video auswählen")
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(2)
-                    Text("Aus Dateien · MP3, M4A, WAV")
+                    Text("Aus Dateien · Audio oder Video mit Ton")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

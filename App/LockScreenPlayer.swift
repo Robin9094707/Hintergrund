@@ -8,7 +8,7 @@ enum LockScreenPlayerError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .audio: "Wähle eine abspielbare Audiodatei aus Dateien, zum Beispiel MP3, M4A oder WAV."
+        case .audio: "Wähle eine abspielbare Audiodatei oder ein Video mit Ton. Diese Datei hat keine unterstützte Tonspur."
         case .cover: "Das animierte Cover konnte nicht geladen werden."
         case .playback: "Die Audiowiedergabe konnte nicht gestartet werden."
         }
@@ -36,10 +36,13 @@ final class LockScreenPlayer: NSObject, AVAudioPlayerDelegate {
         let copied = try await Task.detached(priority: .userInitiated) {
             let scoped = source.startAccessingSecurityScopedResource()
             defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+            guard try source.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true else {
+                throw LockScreenPlayerError.audio
+            }
             return try Workspace.copy(source)
         }.value
         do {
-            let player = try AVAudioPlayer(contentsOf: copied)
+            let player = try await Self.makeAudioPlayer(from: copied)
             guard player.duration.isFinite, player.duration > 0 else { throw LockScreenPlayerError.audio }
             player.delegate = self
             if let audioURL {
@@ -52,6 +55,23 @@ final class LockScreenPlayer: NSObject, AVAudioPlayerDelegate {
             try? FileManager.default.removeItem(at: copied.deletingLastPathComponent())
             throw LockScreenPlayerError.audio
         }
+    }
+
+    private static func makeAudioPlayer(from file: URL) async throws -> AVAudioPlayer {
+        if let audio = try? AVAudioPlayer(contentsOf: file), audio.duration.isFinite, audio.duration > 0 {
+            return audio
+        }
+
+        let asset = AVURLAsset(url: file)
+        guard let tracks = try? await asset.loadTracks(withMediaType: .audio), !tracks.isEmpty,
+              let exporter = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw LockScreenPlayerError.audio
+        }
+        let soundtrack = file.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".m4a")
+        try await exporter.export(to: soundtrack, as: .m4a)
+        let player = try AVAudioPlayer(contentsOf: soundtrack)
+        try? FileManager.default.removeItem(at: file)
+        return player
     }
 
     func start(artwork: LockScreenArtwork, title: String) throws {

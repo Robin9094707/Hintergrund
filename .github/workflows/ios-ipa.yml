@@ -110,7 +110,7 @@ jobs:
             exit 1
           fi
           cat "$REPORT"
-          grep -qx '4K export, animated cover and audio playback passed' "$REPORT"
+          grep -qx '4K export, animated cover, audio import and playback passed' "$REPORT"
           xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/RJ-Wallpaper-Simulator.png"
           xcrun simctl terminate "$DEVICE" "$BUNDLE_ID"
 

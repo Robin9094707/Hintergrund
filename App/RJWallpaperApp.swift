@@ -42,7 +42,7 @@ struct RJWallpaperApp: App {
                 throw StudioError.encode
             }
             try await verifyLockScreenPlayer(progress: progress)
-            result = "4K export, animated cover and audio playback passed"
+            result = "4K export, animated cover, audio import and playback passed"
         } catch {
             result = "Studio smoke test failed: \(error.localizedDescription)"
         }
@@ -68,9 +68,23 @@ struct RJWallpaperApp: App {
         guard preview.size == coverSize, video.size == coverSize, video.hasMotion, video.duration > 0 else {
             throw LockScreenPlayerError.cover
         }
-        try "Starting Now Playing audio".write(to: progress, atomically: true, encoding: .utf8)
+        try "Checking audio and video soundtrack import".write(to: progress, atomically: true, encoding: .utf8)
+        let movieWithAudio = directory.appendingPathComponent("Video-With-Sound.mov")
+        try await writeTestMovie(video: artwork.video, audio: audio, to: movieWithAudio)
         let player = LockScreenPlayer()
+        try await player.importAudio(from: movieWithAudio)
+        guard player.audioTitle == "Video-With-Sound" else { throw LockScreenPlayerError.audio }
+
+        do {
+            try await player.importAudio(from: artwork.preview)
+            throw StudioError.unreadable
+        } catch LockScreenPlayerError.audio {
+            guard player.audioTitle == "Video-With-Sound" else { throw LockScreenPlayerError.audio }
+        }
+
+        try "Starting Now Playing audio".write(to: progress, atomically: true, encoding: .utf8)
         try await player.importAudio(from: audio)
+        guard player.audioTitle == "Audio-Test" else { throw LockScreenPlayerError.audio }
         try player.start(artwork: artwork, title: media.title)
         defer { player.stop() }
         let info = MPNowPlayingInfoCenter.default()
@@ -93,6 +107,25 @@ struct RJWallpaperApp: App {
             CGImageDestinationAddImage(image, try StudioMedia.makePreset(preset).poster, properties)
         }
         guard CGImageDestinationFinalize(image) else { throw StudioError.encode }
+    }
+
+    private func writeTestMovie(video: URL, audio: URL, to url: URL) async throws {
+        let videoAsset = AVURLAsset(url: video)
+        let audioAsset = AVURLAsset(url: audio)
+        let composition = AVMutableComposition()
+        guard let videoSource = try await videoAsset.loadTracks(withMediaType: .video).first,
+              let audioSource = try await audioAsset.loadTracks(withMediaType: .audio).first,
+              let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+            throw StudioError.encode
+        }
+        let range = CMTimeRange(start: .zero, duration: try await videoAsset.load(.duration))
+        try videoTrack.insertTimeRange(range, of: videoSource, at: .zero)
+        try audioTrack.insertTimeRange(range, of: audioSource, at: .zero)
+        guard let exporter = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough) else {
+            throw StudioError.encode
+        }
+        try await exporter.export(to: url, as: .mov)
     }
 
     private func writeTestAudio(to url: URL) throws {

@@ -16,7 +16,7 @@ Die 4K-Angabe bezeichnet die Ausgabeauflösung. Die sichtbaren Details hängen v
 ## Sperrbildschirm-Player
 
 Ein GIF oder Video importieren, den Ausschnitt wählen und **Sperrbildschirm-Player** öffnen.
-Eine Audiodatei aus Dateien wählen und die Wiedergabe starten. Auf dem Sperrbildschirm bei Bedarf auf das kleine Cover tippen.
+Eine Audiodatei oder ein Video mit Ton aus Dateien wählen und die Wiedergabe starten. Auf dem Sperrbildschirm bei Bedarf auf das kleine Cover tippen.
 iOS zeigt das animierte Cover in der System-Medienanzeige während der Wiedergabe. Mit **Stopp** wird die Medienanzeige für RJ Wallpaper beendet.
 
 ## Build
