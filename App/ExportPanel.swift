@@ -35,7 +35,7 @@ struct ExportPanel: View {
                         formatRow(option)
                     }
                     if kind == .live {
-                        Text("Live Photo · 1080 × 1920 · bis zu 3 Sekunden Bewegung beim Aufwecken.")
+                        Text("Live Photo · 1080 × 1920 · bis zu 2 Sekunden Bewegung beim Aufwecken.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

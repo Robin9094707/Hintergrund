@@ -187,7 +187,7 @@ struct StudioView: View {
                     playing = false
                     edit.keyFrame = $0
                 }), range: 0...max(0.01, edit.length), display: seconds(edit.keyFrame))
-                Text("Live Photos verwenden bis zu 3 Sekunden. Der 4K-Videoexport übernimmt den ganzen gewählten Ausschnitt.")
+                Text("Live Photos verwenden bis zu 2 Sekunden rund um das Titelbild. Der 4K-Videoexport übernimmt den ganzen Ausschnitt.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

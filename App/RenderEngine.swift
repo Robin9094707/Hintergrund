@@ -61,14 +61,14 @@ enum RenderEngine {
             case .still:
                 let image = try await stillImage(media, time: edit.start + edit.keyFrame, size: size)
                 let output = folder.appendingPathComponent("RJ-Wallpaper-4K.jpg")
-                try writeJPEG(compose(image, edit: edit, size: size), size: size, at: output, identifier: nil)
+                try writeStill(compose(image, edit: edit, size: size), size: size, at: output)
                 progress(1)
                 return RenderedWallpaper(kind: kind, file: output, pairedMovie: nil)
             case .movie, .live:
                 let isLive = kind == .live
                 let identifier = isLive ? UUID().uuidString : nil
                 let video = folder.appendingPathComponent(isLive ? "RJ-Live.mov" : "RJ-Wallpaper-4K.mp4")
-                let photo = isLive ? folder.appendingPathComponent("RJ-Live.jpg") : nil
+                let photo = isLive ? folder.appendingPathComponent("RJ-Live.heic") : nil
                 try await writeMovie(media, edit: edit, size: size, at: video, photo: photo,
                                      identifier: identifier, progress: progress)
                 return RenderedWallpaper(kind: kind, file: photo ?? video, pairedMovie: isLive ? video : nil)
@@ -137,10 +137,11 @@ enum RenderEngine {
         return image
     }
 
-    private static func writeJPEG(_ image: CIImage, size: CGSize, at url: URL, identifier: String?) throws {
+    private static func writeStill(_ image: CIImage, size: CGSize, at url: URL, identifier: String? = nil) throws {
+        let format: UTType = identifier == nil ? .jpeg : .heic
         guard let cgImage = context.createCGImage(image, from: CGRect(origin: .zero, size: size),
                                                  format: .RGBA8, colorSpace: colorSpace),
-              let target = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+              let target = CGImageDestinationCreateWithURL(url as CFURL, format.identifier as CFString, 1, nil) else {
             throw StudioError.encode
         }
         var properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.96]
@@ -156,14 +157,15 @@ enum RenderEngine {
                                    progress: @escaping @Sendable (Double) -> Void) async throws {
         let width = Int(size.width)
         let height = Int(size.height)
+        let fps: Int32 = photo == nil ? 30 : 60
         let writer = try AVAssetWriter(outputURL: output, fileType: photo == nil ? .mp4 : .mov)
         writer.shouldOptimizeForNetworkUse = true
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: photo == nil ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: width, AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: photo == nil ? 24_000_000 : 12_000_000,
-                AVVideoExpectedSourceFrameRateKey: 30
+                AVVideoExpectedSourceFrameRateKey: Int(fps)
             ],
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
@@ -172,6 +174,7 @@ enum RenderEngine {
             ]
         ])
         guard writer.canAdd(input) else { throw StudioError.encode }
+        input.mediaTimeScale = 600
         writer.add(input)
         let buffers = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -193,13 +196,17 @@ enum RenderEngine {
             timedMetadata = nil
         }
 
-        // A Live Photo uses up to three seconds. Pad very short clips by repeating their last frame.
-        let seconds = photo == nil ? edit.length : max(1, min(3, edit.length))
-        let count = max(1, Int((seconds * 30).rounded()))
-        let keyIndex = min(count - 1, max(0, Int((edit.keyFrame * 30).rounded())))
+        // Keep the Live Photo short and keep its HEIC cover aligned with a frame in its movie.
+        let sourceDuration = photo == nil ? edit.length : min(2, edit.length)
+        let sourceStart = edit.start + (photo == nil ? 0 : min(max(0, edit.keyFrame - sourceDuration / 2),
+                                                               edit.length - sourceDuration))
+        let seconds = photo == nil ? sourceDuration : max(1, sourceDuration)
+        let count = max(1, Int((seconds * Double(fps)).rounded()))
+        let localKeyTime = edit.start + edit.keyFrame - sourceStart
+        let keyIndex = min(count - 1, max(0, Int((localKeyTime * Double(fps)).rounded())))
         let reader: MovieFrames?
         if media.kind == .video, let url = media.url {
-            reader = try await MovieFrames.open(url: url, start: edit.start, duration: edit.length)
+            reader = try await MovieFrames.open(url: url, start: sourceStart, duration: sourceDuration)
         } else {
             reader = nil
         }
@@ -213,10 +220,10 @@ enum RenderEngine {
             let item = AVMutableMetadataItem()
             item.keySpace = .quickTimeMetadata
             item.key = "com.apple.quicktime.still-image-time" as NSString
-            item.value = 0 as NSNumber
+            item.value = NSNumber(value: Int8(-1))
             item.dataType = kCMMetadataBaseDataType_SInt8 as String
-            let range = CMTimeRange(start: CMTime(value: Int64(keyIndex), timescale: 30),
-                                    duration: CMTime(value: 1, timescale: 30))
+            let range = CMTimeRange(start: CMTime(value: Int64(keyIndex), timescale: fps),
+                                    duration: CMTime(value: 1, timescale: fps))
             guard timedMetadata.append(AVTimedMetadataGroup(items: [item], timeRange: range)) else {
                 throw writer.error ?? StudioError.encode
             }
@@ -231,7 +238,7 @@ enum RenderEngine {
                 guard writer.status == .writing else { throw writer.error ?? StudioError.encode }
                 try await Task.sleep(for: .milliseconds(5))
             }
-            let time = edit.start + min(Double(frame) / 30, max(0, edit.length - 1.0 / 60))
+            let time = sourceStart + min(Double(frame) / Double(fps), max(0, sourceDuration - 0.5 / Double(fps)))
             try autoreleasepool {
                 let source: CIImage
                 if let reader {
@@ -252,20 +259,20 @@ enum RenderEngine {
                 }
                 let composed = compose(source, edit: edit, size: size)
                 if frame == keyIndex, let photo {
-                    try writeJPEG(composed, size: size, at: photo, identifier: identifier)
+                    try writeStill(composed, size: size, at: photo, identifier: identifier)
                 }
                 guard let pool = buffers.pixelBufferPool else { throw StudioError.encode }
                 var pixelBuffer: CVPixelBuffer?
                 guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer) == kCVReturnSuccess,
                       let pixelBuffer else { throw StudioError.encode }
                 context.render(composed, to: pixelBuffer, bounds: CGRect(origin: .zero, size: size), colorSpace: colorSpace)
-                guard buffers.append(pixelBuffer, withPresentationTime: CMTime(value: Int64(frame), timescale: 30)) else {
+                guard buffers.append(pixelBuffer, withPresentationTime: CMTime(value: Int64(frame), timescale: fps)) else {
                     throw writer.error ?? StudioError.encode
                 }
             }
             if frame.isMultiple(of: 6) { progress(Double(frame + 1) / Double(count) * 0.95) }
         }
-        writer.endSession(atSourceTime: CMTime(value: Int64(count), timescale: 30))
+        writer.endSession(atSourceTime: CMTime(value: Int64(count), timescale: fps))
         input.markAsFinished()
         await writer.finishWriting()
         guard writer.status == .completed else { throw writer.error ?? StudioError.encode }
