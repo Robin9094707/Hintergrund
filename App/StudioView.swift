@@ -11,6 +11,7 @@ struct StudioView: View {
     @State private var playing = false
     @State private var overlays = true
     @State private var pickerItem: PhotosPickerItem?
+    @State private var choosingPhotos = false
     @State private var choosingFile = false
     @State private var importing = false
     @State private var exportSheet = false
@@ -70,6 +71,8 @@ struct StudioView: View {
                 ExportPanel(media: media, edit: edit)
             }
         }
+        .photosPicker(isPresented: $choosingPhotos, selection: $pickerItem,
+                      matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.image, .movie, .video]) { result in
             switch result {
             case .success(let url):
@@ -284,19 +287,18 @@ struct StudioView: View {
         GlassEffectContainer(spacing: 11) {
             HStack(spacing: 11) {
                 Menu {
-                    PhotosPicker(selection: $pickerItem, matching: .any(of: [.images, .videos]), preferredItemEncoding: .current) {
-                        Label("Aus Fotos", systemImage: "photo.on.rectangle")
-                    }
+                    Button("Aus Fotos", systemImage: "photo.on.rectangle") { choosingPhotos = true }
                     Button("Aus Dateien", systemImage: "folder") { choosingFile = true }
                 } label: {
                     Group {
                         if importing { ProgressView() }
-                        else { Image(systemName: "plus").font(.title3.weight(.semibold)) }
+                        else { Label("Import", systemImage: "plus").font(.subheadline.weight(.semibold)) }
                     }
-                    .frame(width: 51, height: 50)
-                    .contentShape(.circle)
+                    .frame(minWidth: 78, minHeight: 50)
+                    .padding(.horizontal, 10)
+                    .contentShape(.capsule)
                 }
-                .glassEffect(.regular.interactive(), in: .circle)
+                .glassEffect(.regular.interactive(), in: .capsule)
                 .accessibilityLabel("Importieren")
                 .disabled(importing)
 

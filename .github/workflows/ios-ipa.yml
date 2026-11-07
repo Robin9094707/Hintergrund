@@ -53,31 +53,64 @@ jobs:
           (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/RJ-Wallpaper-Studio-1.0.0-unsigned.ipa" Payload)
           unzip -tq dist/*.ipa
 
-      - name: Build and launch on an iPhone simulator
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v6
+        with:
+          name: RJ-Wallpaper-Studio-unsigned
+          path: dist/*.ipa
+          if-no-files-found: error
+
+      - name: Build simulator app
+        timeout-minutes: 5
         run: |
-          DEVICE="$(xcrun simctl list devices available -j | python3 -c '
-          import json, re, sys
-          devices = json.load(sys.stdin)["devices"]
-          runtimes = [key for key in devices if re.fullmatch(r"com[.]apple[.]CoreSimulator[.]SimRuntime[.]iOS-\d+(?:-\d+)*", key)]
-          for runtime in sorted(runtimes, key=lambda key: tuple(map(int, key.split(".iOS-")[-1].split("-"))), reverse=True):
-              iphones = [d for d in devices[runtime] if d["name"].startswith("iPhone") and d["isAvailable"]]
-              if iphones:
-                  print(next((d for d in iphones if d["name"] == "iPhone 17 Pro Max"), iphones[0])["udid"])
-                  break
-          ')"
-          test -n "$DEVICE"
-          xcrun simctl list devices available | grep "$DEVICE"
-          xcrun simctl boot "$DEVICE" || xcrun simctl list devices | grep "$DEVICE" | grep -q Booted
           xcodebuild -project RJWallpaper.xcodeproj -scheme RJWallpaper \
-            -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE" \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/sim" CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- build -quiet
-          xcrun simctl bootstatus "$DEVICE" -b
-          xcrun simctl status_bar "$DEVICE" override --time '9:41' --dataNetwork wifi --wifiMode active --wifiBars 3 --batteryState unplugged --batteryLevel 100
+
+      - name: Boot iPhone simulator
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          SDK="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-${SDK//./-}"
+          xcrun simctl list runtimes available
+          xcrun simctl list devices "$RUNTIME" available
+          DEVICE="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"].get(sys.argv[1], [])
+          iphones = [d for d in devices if d["name"].startswith("iPhone") and d["isAvailable"]]
+          if iphones:
+              print(next((d for d in iphones if d["name"] == "iPhone 17"), iphones[0])["udid"])
+          ' "$RUNTIME")"
+          if [ -z "$DEVICE" ]; then
+            DEVICE="$(xcrun simctl create RJ-Test-iPhone com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$RUNTIME")"
+          fi
+          echo "SIMULATOR_ID=$DEVICE" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE"
+          python3 - "$DEVICE" <<'PYBOOT'
+          import re, subprocess, sys, time
+          deadline = time.monotonic() + 100
+          while time.monotonic() < deadline:
+              try:
+                  services = subprocess.run(
+                      ["xcrun", "simctl", "spawn", sys.argv[1], "launchctl", "list"],
+                      capture_output=True, text=True, timeout=8
+                  )
+                  if re.search(r"^\d+\s+\S+\s+com[.]apple[.]SpringBoard$", services.stdout, re.MULTILINE):
+                      print("iPhone SpringBoard is running")
+                      break
+              except subprocess.TimeoutExpired:
+                  pass
+              time.sleep(2)
+          else:
+              raise SystemExit("The iPhone simulator did not start SpringBoard")
+          PYBOOT
+
+      - name: Launch app and verify 4K export
+        timeout-minutes: 4
+        run: |
+          DEVICE="$SIMULATOR_ID"
           xcrun simctl install "$DEVICE" "$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/RJWallpaper.app"
-          xcrun simctl launch "$DEVICE" "$BUNDLE_ID"
-          sleep 4
-          xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/RJ-Wallpaper-Simulator.png"
-          xcrun simctl terminate "$DEVICE" "$BUNDLE_ID"
           xcrun simctl launch "$DEVICE" "$BUNDLE_ID" --ci-smoke
           CONTAINER="$(xcrun simctl get_app_container "$DEVICE" "$BUNDLE_ID" data)"
           for _ in $(seq 1 25); do
@@ -86,13 +119,8 @@ jobs:
           done
           cat "$CONTAINER/Library/Caches/rj-smoke.txt"
           grep -qx '4K export and reimport passed' "$CONTAINER/Library/Caches/rj-smoke.txt"
-
-      - name: Upload unsigned IPA
-        uses: actions/upload-artifact@v6
-        with:
-          name: RJ-Wallpaper-Studio-unsigned
-          path: dist/*.ipa
-          if-no-files-found: error
+          xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/RJ-Wallpaper-Simulator.png"
+          xcrun simctl terminate "$DEVICE" "$BUNDLE_ID"
 
       - name: Upload simulator screenshot
         uses: actions/upload-artifact@v6
