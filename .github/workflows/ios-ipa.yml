@@ -49,8 +49,10 @@ jobs:
           test -x "$APP/RJWallpaper"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")" = "$BUNDLE_ID"
           test "$(lipo -archs "$APP/RJWallpaper")" = arm64
+          test "$(/usr/libexec/PlistBuddy -c 'Print UIBackgroundModes:0' "$APP/Info.plist")" = audio
+          VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Info.plist")"
           ditto "$APP" "$RUNNER_TEMP/ipa/Payload/RJWallpaper.app"
-          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/RJ-Wallpaper-Studio-1.0.0-unsigned.ipa" Payload)
+          (cd "$RUNNER_TEMP/ipa" && zip -qry "$GITHUB_WORKSPACE/dist/RJ-Wallpaper-Studio-${VERSION}-unsigned.ipa" Payload)
           unzip -tq dist/*.ipa
 
       - name: Upload unsigned IPA
@@ -87,7 +89,7 @@ jobs:
           echo "SIMULATOR_ID=$DEVICE" >> "$GITHUB_ENV"
           xcrun simctl bootstatus "$DEVICE" -b
 
-      - name: Launch app and verify 4K export
+      - name: Launch app and verify 4K export and animated cover
         timeout-minutes: 4
         run: |
           DEVICE="$SIMULATOR_ID"
@@ -99,7 +101,7 @@ jobs:
             sleep 2
           done
           cat "$CONTAINER/Library/Caches/rj-smoke.txt"
-          grep -qx '4K export and reimport passed' "$CONTAINER/Library/Caches/rj-smoke.txt"
+          grep -qx '4K export, animated cover and audio playback passed' "$CONTAINER/Library/Caches/rj-smoke.txt"
           xcrun simctl io "$DEVICE" screenshot "$RUNNER_TEMP/RJ-Wallpaper-Simulator.png"
           xcrun simctl terminate "$DEVICE" "$BUNDLE_ID"
 

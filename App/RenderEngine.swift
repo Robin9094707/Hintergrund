@@ -48,7 +48,17 @@ struct RenderedWallpaper {
     }
 }
 
+struct LockScreenArtwork {
+    let video: URL
+    let preview: URL
+}
+
 enum RenderEngine {
+    private enum MovieProfile {
+        case export
+        case live(photo: URL, identifier: String)
+        case artwork(preview: URL)
+    }
     static let context = CIContext(options: [.cacheIntermediates: false])
     static let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
@@ -66,13 +76,30 @@ enum RenderEngine {
                 return RenderedWallpaper(kind: kind, file: output, pairedMovie: nil)
             case .movie, .live:
                 let isLive = kind == .live
-                let identifier = isLive ? UUID().uuidString : nil
                 let video = folder.appendingPathComponent(isLive ? "RJ-Live.mov" : "RJ-Wallpaper-4K.mp4")
                 let photo = isLive ? folder.appendingPathComponent("RJ-Live.heic") : nil
-                try await writeMovie(media, edit: edit, size: size, at: video, photo: photo,
-                                     identifier: identifier, progress: progress)
+                let profile: MovieProfile = photo.map { .live(photo: $0, identifier: UUID().uuidString) } ?? .export
+                try await writeMovie(media, edit: edit, size: size, at: video, profile: profile, progress: progress)
                 return RenderedWallpaper(kind: kind, file: photo ?? video, pairedMovie: isLive ? video : nil)
             }
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            throw error
+        }
+    }
+
+    static func renderLockScreenArtwork(_ media: StudioMedia, edit: WallpaperEdit,
+                                        progress: @escaping @Sendable (Double) -> Void) async throws -> LockScreenArtwork {
+        guard media.hasMotion else { throw StudioError.emptyVideo }
+        let folder = try Workspace.makeDirectory()
+        let result = LockScreenArtwork(video: folder.appendingPathComponent("Cover.mp4"),
+                                       preview: folder.appendingPathComponent("Cover.jpg"))
+        var clip = edit
+        clip.length = min(clip.length, 29)
+        do {
+            try await writeMovie(media, edit: clip, size: CGSize(width: 900, height: 1200),
+                                 at: result.video, profile: .artwork(preview: result.preview), progress: progress)
+            return result
         } catch {
             try? FileManager.default.removeItem(at: folder)
             throw error
@@ -153,18 +180,31 @@ enum RenderEngine {
     }
 
     private static func writeMovie(_ media: StudioMedia, edit: WallpaperEdit, size: CGSize, at output: URL,
-                                   photo: URL?, identifier: String?,
+                                   profile: MovieProfile,
                                    progress: @escaping @Sendable (Double) -> Void) async throws {
         let width = Int(size.width)
         let height = Int(size.height)
-        let fps: Int32 = photo == nil ? 30 : 60
-        let writer = try AVAssetWriter(outputURL: output, fileType: photo == nil ? .mp4 : .mov)
+        let photo: URL?
+        let identifier: String?
+        let codec: AVVideoCodecType
+        let bitRate: Int
+        switch profile {
+        case .export:
+            (photo, identifier, codec, bitRate) = (nil, nil, .hevc, 24_000_000)
+        case .live(let cover, let liveIdentifier):
+            (photo, identifier, codec, bitRate) = (cover, liveIdentifier, .hevc, 12_000_000)
+        case .artwork(let preview):
+            (photo, identifier, codec, bitRate) = (preview, nil, .h264, 4_000_000)
+        }
+        let isLive = identifier != nil
+        let fps: Int32 = isLive ? 60 : 30
+        let writer = try AVAssetWriter(outputURL: output, fileType: isLive ? .mov : .mp4)
         writer.shouldOptimizeForNetworkUse = true
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.hevc,
+            AVVideoCodecKey: codec,
             AVVideoWidthKey: width, AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: photo == nil ? 24_000_000 : 12_000_000,
+                AVVideoAverageBitRateKey: bitRate,
                 AVVideoExpectedSourceFrameRateKey: Int(fps)
             ],
             AVVideoColorPropertiesKey: [
@@ -197,10 +237,10 @@ enum RenderEngine {
         }
 
         // Keep the Live Photo short and keep its HEIC cover aligned with a frame in its movie.
-        let sourceDuration = photo == nil ? edit.length : min(2, edit.length)
-        let sourceStart = edit.start + (photo == nil ? 0 : min(max(0, edit.keyFrame - sourceDuration / 2),
-                                                               edit.length - sourceDuration))
-        let seconds = photo == nil ? sourceDuration : max(1, sourceDuration)
+        let sourceDuration = isLive ? min(2, edit.length) : edit.length
+        let sourceStart = edit.start + (isLive ? min(max(0, edit.keyFrame - sourceDuration / 2),
+                                                    edit.length - sourceDuration) : 0)
+        let seconds = isLive ? max(1, sourceDuration) : sourceDuration
         let count = max(1, Int((seconds * Double(fps)).rounded()))
         let localKeyTime = edit.start + edit.keyFrame - sourceStart
         let keyIndex = min(count - 1, max(0, Int((localKeyTime * Double(fps)).rounded())))
@@ -258,7 +298,7 @@ enum RenderEngine {
                     throw StudioError.emptyVideo
                 }
                 let composed = compose(source, edit: edit, size: size)
-                if frame == keyIndex, let photo {
+                if frame == (isLive ? keyIndex : 0), let photo {
                     try writeStill(composed, size: size, at: photo, identifier: identifier)
                 }
                 guard let pool = buffers.pixelBufferPool else { throw StudioError.encode }

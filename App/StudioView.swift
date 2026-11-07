@@ -15,6 +15,8 @@ struct StudioView: View {
     @State private var choosingFile = false
     @State private var importing = false
     @State private var exportSheet = false
+    @State private var lockScreenSheet = false
+    @State private var lockScreenPlayer = LockScreenPlayer()
     @State private var guideSheet = false
     @State private var error: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -69,6 +71,11 @@ struct StudioView: View {
         .sheet(isPresented: $exportSheet, onDismiss: resumePreview) {
             if let media {
                 ExportPanel(media: media, edit: edit)
+            }
+        }
+        .sheet(isPresented: $lockScreenSheet, onDismiss: resumePreview) {
+            if let media {
+                LockScreenPanel(media: media, edit: edit, player: lockScreenPlayer)
             }
         }
         .photosPicker(isPresented: $choosingPhotos, selection: $pickerItem,
@@ -128,7 +135,7 @@ struct StudioView: View {
             .foregroundStyle(.white.opacity(0.68))
             .accessibilityHidden(true)
 
-            PreviewCanvas(media: media, edit: $edit, playing: playing && !exportSheet,
+            PreviewCanvas(media: media, edit: $edit, playing: playing && !exportSheet && !lockScreenSheet,
                           showsLockScreen: overlays)
                 .id(media.id)
                 .aspectRatio(9.0 / 16, contentMode: .fit)
@@ -161,6 +168,17 @@ struct StudioView: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
                 }
+            }
+            if media.hasMotion || lockScreenPlayer.isActive {
+                Button {
+                    playing = false
+                    lockScreenSheet = true
+                } label: {
+                    Label("Sperrbildschirm-Player", systemImage: lockScreenPlayer.isPlaying ? "waveform" : "play.rectangle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
             }
         }
         .padding(14)
