@@ -1,6 +1,5 @@
 import PhotosUI
 import SwiftUI
-import UniformTypeIdentifiers
 
 private let studioMint = Color(rgb: 0x9FFFE5)
 private let studioBackground = Color(rgb: 0x0C1020)
@@ -80,12 +79,10 @@ struct StudioView: View {
         }
         .photosPicker(isPresented: $choosingPhotos, selection: $pickerItem,
                       matching: .any(of: [.images, .videos]), preferredItemEncoding: .current)
-        .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.image, .movie, .video]) { result in
-            switch result {
-            case .success(let url):
-                Task { await importFromFiles(url) }
-            case .failure(let failure):
-                error = failure.localizedDescription
+        .sheet(isPresented: $choosingFile) {
+            StudioDocumentPicker { url in
+                choosingFile = false
+                if let url { Task { await importFromFiles(url) } }
             }
         }
         .onChange(of: pickerItem) { _, item in
@@ -395,9 +392,17 @@ struct StudioView: View {
             let copied = try await Task.detached {
                 let scoped = url.startAccessingSecurityScopedResource()
                 defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                guard try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true else {
+                    throw StudioError.unreadable
+                }
                 return try Workspace.copy(url)
             }.value
-            select(try await StudioMedia.open(copied))
+            do {
+                select(try await StudioMedia.open(copied))
+            } catch {
+                try? FileManager.default.removeItem(at: copied.deletingLastPathComponent())
+                throw error
+            }
         } catch {
             self.error = error.localizedDescription
         }

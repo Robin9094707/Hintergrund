@@ -2,6 +2,7 @@
 import AVFoundation
 import ImageIO
 import MediaPlayer
+import UIKit
 import UniformTypeIdentifiers
 #endif
 import SwiftUI
@@ -42,7 +43,7 @@ struct RJWallpaperApp: App {
                 throw StudioError.encode
             }
             try await verifyLockScreenPlayer(progress: progress)
-            result = "4K export, animated cover, audio import and playback passed"
+            result = "4K export, document picker callback, animated cover and audio playback passed"
         } catch {
             result = "Studio smoke test failed: \(error.localizedDescription)"
         }
@@ -82,8 +83,14 @@ struct RJWallpaperApp: App {
             guard player.audioTitle == "Video-With-Sound" else { throw LockScreenPlayerError.audio }
         }
 
-        try "Starting Now Playing audio".write(to: progress, atomically: true, encoding: .utf8)
-        try await player.importAudio(from: audio)
+        try "Checking the native document picker callback".write(to: progress, atomically: true, encoding: .utf8)
+        var selectedFile: URL?
+        let documentPicker = StudioDocumentPicker { selectedFile = $0 }
+        let delegate = documentPicker.makeCoordinator()
+        let picker = documentPicker.makePicker(delegate: delegate)
+        picker.delegate?.documentPicker?(picker, didPickDocumentsAt: [audio])
+        guard let selectedFile, selectedFile == audio else { throw LockScreenPlayerError.audio }
+        try await player.importAudio(from: selectedFile)
         guard player.audioTitle == "Audio-Test" else { throw LockScreenPlayerError.audio }
         try player.start(artwork: artwork, title: media.title)
         defer { player.stop() }

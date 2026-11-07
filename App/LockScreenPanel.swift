@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct LockScreenPanel: View {
     let media: StudioMedia
@@ -34,6 +33,13 @@ struct LockScreenPanel: View {
                     Label(player.coverTitle ?? media.title, systemImage: "film")
                         .font(.subheadline.weight(.medium))
                     audioButton
+                    if media.kind == .video, let video = media.url, !player.isActive {
+                        Button("Ton aus aktuellem Video", systemImage: "waveform") {
+                            Task { await importAudio(video) }
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(working)
+                    }
                     if player.isActive {
                         playbackButtons
                         Text("Sperre dein iPhone und tippe im Medienplayer auf das Cover, falls es klein angezeigt wird.")
@@ -75,12 +81,10 @@ struct LockScreenPanel: View {
             }
         }
         .interactiveDismissDisabled(working)
-        .fileImporter(isPresented: $pickingAudio, allowedContentTypes: [.item]) { result in
-            switch result {
-            case .success(let url):
-                Task { await importAudio(url) }
-            case .failure(let failure):
-                error = failure.localizedDescription
+        .sheet(isPresented: $pickingAudio) {
+            StudioDocumentPicker { url in
+                pickingAudio = false
+                if let url { Task { await importAudio(url) } }
             }
         }
         .alert("Sperrbildschirm-Player", isPresented: Binding(
@@ -141,6 +145,7 @@ struct LockScreenPanel: View {
     }
 
     private func importAudio(_ url: URL) async {
+        guard !working, !player.isActive else { return }
         importing = true
         defer { importing = false }
         do {
