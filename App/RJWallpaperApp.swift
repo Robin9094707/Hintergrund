@@ -28,8 +28,10 @@ struct RJWallpaperApp: App {
 #if DEBUG
     private func verifyStudio() async {
         let report = URL.cachesDirectory.appendingPathComponent("rj-smoke.txt")
+        let progress = URL.cachesDirectory.appendingPathComponent("rj-smoke-progress.txt")
         let result: String
         do {
+            try "Rendering 4K photo".write(to: progress, atomically: true, encoding: .utf8)
             let preset = try StudioMedia.makePreset(.aurora)
             var edit = WallpaperEdit.fresh(for: preset)
             edit.zoom = 1.2
@@ -39,7 +41,7 @@ struct RJWallpaperApp: App {
             guard imported.size == CGSize(width: 2160, height: 3840), imported.kind == .image else {
                 throw StudioError.encode
             }
-            try await verifyLockScreenPlayer()
+            try await verifyLockScreenPlayer(progress: progress)
             result = "4K export, animated cover and audio playback passed"
         } catch {
             result = "Studio smoke test failed: \(error.localizedDescription)"
@@ -48,7 +50,8 @@ struct RJWallpaperApp: App {
     }
 
     @MainActor
-    private func verifyLockScreenPlayer() async throws {
+    private func verifyLockScreenPlayer(progress: URL) async throws {
+        try "Preparing GIF and WAV fixtures".write(to: progress, atomically: true, encoding: .utf8)
         let directory = try Workspace.makeDirectory()
         let gif = directory.appendingPathComponent("Cover-Test.gif")
         let audio = directory.appendingPathComponent("Audio-Test.wav")
@@ -57,6 +60,7 @@ struct RJWallpaperApp: App {
 
         let media = try await StudioMedia.open(gif)
         guard media.kind == .gif else { throw StudioError.unreadable }
+        try "Rendering 3:4 animated cover".write(to: progress, atomically: true, encoding: .utf8)
         let artwork = try await RenderEngine.renderLockScreenArtwork(media, edit: .fresh(for: media)) { _ in }
         let preview = try await StudioMedia.open(artwork.preview)
         let video = try await StudioMedia.open(artwork.video)
@@ -64,6 +68,7 @@ struct RJWallpaperApp: App {
         guard preview.size == coverSize, video.size == coverSize, video.hasMotion, video.duration > 0 else {
             throw LockScreenPlayerError.cover
         }
+        try "Starting Now Playing audio".write(to: progress, atomically: true, encoding: .utf8)
         let player = LockScreenPlayer()
         try await player.importAudio(from: audio)
         try player.start(artwork: artwork, title: media.title)
